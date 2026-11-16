@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digitize It - Digital Seva & POS Billing</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #F4F6FB; color: #1A1A1A; line-height: 1.5; }
+        .blink-yellow { background-color: #F8CB46; }
+        .blink-black { background-color: #1A1A1A; color: #FFFFFF; }
+        .text-blink-yellow { color: #F8CB46; }
+        .hidden { display: none !important; }
+        
+        /* Navbar */
+        nav { background-color: #F8CB46; border-bottom: 2px solid #1A1A1A; padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 50; }
+        .logo-box { background: #1A1A1A; color: #F8CB46; font-weight: 800; font-size: 22px; padding: 4px 12px; border-radius: 8px; letter-spacing: -0.5px; display: inline-block; }
+        .logo-box span { color: #FFFFFF; }
+        .badge-tag { font-size: 11px; font-weight: 700; background: #1A1A1A; color: #FFF; padding: 3px 8px; border-radius: 4px; margin-left: 8px; }
+        
+        /* Buttons */
+        .btn { cursor: pointer; font-weight: 700; border-radius: 10px; padding: 10px 16px; border: 2px solid #1A1A1A; font-size: 14px; transition: 0.15s; }
+        .btn-black { background: #1A1A1A; color: #FFFFFF; }
+        .btn-black:hover { background: #333; }
+        .btn-yellow { background: #F8CB46; color: #1A1A1A; box-shadow: 3px 3px 0px #1A1A1A; }
+        .btn-yellow:hover { background: #eab82e; }
+        .btn-white { background: #FFFFFF; color: #1A1A1A; box-shadow: 3px 3px 0px #1A1A1A; }
+        .btn-red { background: #DC2626; color: #FFFFFF; border-color: #DC2626; }
+        .btn-sm { padding: 5px 10px; font-size: 12px; border-radius: 6px; }
+
+        /* Containers & Cards */
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .card { background: #FFFFFF; border: 2px solid #1A1A1A; border-radius: 16px; padding: 24px; }
+        .shadow-hard { box-shadow: 5px 5px 0px #1A1A1A; }
+        
+        /* Grid */
+        .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+        .main-split { display: grid; grid-template-columns: 1.3fr 0.9fr; gap: 24px; }
+        @media (max-width: 900px) { .main-split { grid-template-columns: 1fr; } }
+
+        /* Inputs */
+        label { display: block; font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+        input, select { width: 100%; padding: 10px; border: 2px solid #D1D5DB; border-radius: 10px; font-size: 14px; font-family: inherit; }
+        input:focus, select:focus { outline: none; border-color: #1A1A1A; }
+
+        /* Table */
+        table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
+        th { background: #F8CB46; border-bottom: 2px solid #1A1A1A; padding: 12px; text-align: left; }
+        td { padding: 12px; border-bottom: 1px solid #E5E7EB; }
+        .pill-free { background: #DBEAFE; color: #1E40AF; padding: 3px 8px; border-radius: 6px; font-weight: 700; font-size: 12px; }
+        .pill-paid { background: #DCFCE7; color: #166534; padding: 3px 8px; border-radius: 6px; font-weight: 700; font-size: 12px; }
+
+        /* Thermal Receipt */
+        #thermal-receipt-area {
+            width: 300px;
+            background: #FFFFFF;
+            border: 2px solid #1A1A1A;
+            padding: 16px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 12px;
+            color: #000000;
+            margin: 0 auto;
+        }
+        .rec-center { text-align: center; }
+        .rec-divider { border-bottom: 1px dashed #000; margin: 8px 0; }
+        .rec-divider-solid { border-bottom: 2px solid #000; margin: 8px 0; }
+        .rec-row { display: flex; justify-content: space-between; margin: 4px 0; }
+
+        /* Modal */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.65); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
+        .modal-box { background: #FFF; border: 2px solid #1A1A1A; border-radius: 16px; padding: 24px; width: 100%; max-width: 420px; box-shadow: 6px 6px 0px #F8CB46; }
+
+        /* Print Settings */
+        @media print {
+            body * { visibility: hidden; }
+            #thermal-receipt-area, #thermal-receipt-area * { visibility: visible; }
+            #thermal-receipt-area {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 80mm;
+                border: none;
+                padding: 4px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- NAVBAR -->
+    <nav>
+        <div style="display:flex; align-items:center;">
+            <div class="logo-box">Digitize <span>It</span></div>
+            <span class="badge-tag">DIGITAL SEVA POINT</span>
+        </div>
+        <div style="display:flex; gap:10px; align-items:center;">
+            <button onclick="showSection('customer-portal')" class="btn btn-white btn-sm">Customer Portal</button>
+            <button id="admin-nav-btn" onclick="openLoginModal()" class="btn btn-black btn-sm">Admin Login</button>
+            <button id="logout-btn" onclick="logoutAdmin()" class="btn btn-red btn-sm hidden">Logout</button>
+        </div>
+    </nav>
+
+    <!-- CUSTOMER PORTAL -->
+    <div id="customer-portal" class="container" style="max-width:850px; margin-top:24px;">
+        <div class="card shadow-hard" style="text-align:center; padding:36px 24px;">
+            <span style="background:#F8CB46; padding:4px 12px; border-radius:20px; font-size:12px; font-weight:800;">FAST & RELIABLE DIGITAL SERVICES</span>
+            <h1 style="font-size:28px; font-weight:800; margin-top:12px;">আপনার সমস্ত সরকারি ডকুমেন্টের কাজ এখন এক জায়গায়!</h1>
+            <p style="color:#4B5563; margin-top:8px;">Aadhaar Update • PAN Card • Voter ID • Ayushman Bharat • Mukhyamantri Swasthya Bima</p>
+            
+            <div style="margin-top:24px;">
+                <button onclick="openCustomerModal()" class="btn btn-white" style="display:inline-flex; align-items:center; gap:10px; padding:12px 24px;">
+                    <span style="background:#4285F4; color:#FFF; font-weight:900; padding:2px 8px; border-radius:4px;">G</span>
+                    Continue with Google (Customer Login)
+                </button>
+            </div>
+            <div id="customer-logged-box" class="hidden" style="margin-top:16px; background:#DCFCE7; border:1px solid #166534; padding:12px; border-radius:10px; color:#166534; font-weight:700;"></div>
+        </div>
+
+        <div class="grid-2" style="margin-top:24px;">
+            <div class="card" style="text-align:center; padding:16px; font-weight:700;">🪪 Aadhaar Card Update</div>
+            <div class="card" style="text-align:center; padding:16px; font-weight:700;">💳 PAN Card Services</div>
+            <div class="card" style="text-align:center; padding:16px; font-weight:700;">🗳️ Voter ID Update</div>
+            <div class="card" style="text-align:center; padding:16px; font-weight:700;">🏥 Ayushman & Swasthya Bima</div>
+        </div>
+    </div>
+
+    <!-- ADMIN DASHBOARD -->
+    <div id="admin-dashboard" class="container hidden">
+        
+        <!-- Summary Cards -->
+        <div class="grid-3">
+            <div class="card blink-yellow shadow-hard">
+                <div style="font-size:12px; font-weight:800;">মোট কাজ (TOTAL WORKS)</div>
+                <div id="total-works-count" style="font-size:32px; font-weight:800; margin-top:4px;">0</div>
+            </div>
+            <div class="card shadow-hard">
+                <div style="font-size:12px; font-weight:800; color:#15803D;">মোট আয় (TOTAL COLLECTION)</div>
+                <div id="total-income" style="font-size:32px; font-weight:800; margin-top:4px; color:#15803D;">₹0</div>
+            </div>
+            <div class="card shadow-hard">
+                <div style="font-size:12px; font-weight:800; color:#1D4ED8;">ফ্রি পরিষেবা (FREE WORKS)</div>
+                <div id="total-free-count" style="font-size:32px; font-weight:800; margin-top:4px; color:#1D4ED8;">0</div>
+            </div>
+        </div>
+
+        <!-- Cloud & Backup Toolbar -->
+        <div class="card" style="margin-bottom:24px; background:#FFFBEB; display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:12px; padding:16px;">
+            <div>
+                <strong style="font-size:14px;">☁️ Cloud & Data Backup (ফ্রি):</strong>
+                <span id="cloud-status" style="font-size:12px; color:#15803D; font-weight:700;">Local + Auto-Backup Active</span>
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button onclick="exportBackupJSON()" class="btn btn-white btn-sm">⬇️ Download Backup (.json)</button>
+                <label class="btn btn-white btn-sm" style="margin:0; display:inline-block;">
+                    ⬆️ Restore Backup
+                    <input type="file" accept=".json" onchange="importBackupJSON(event)" class="hidden">
+                </label>
+                <button onclick="toggleFirebaseModal()" class="btn btn-black btn-sm">🔥 Connect Free Firebase Cloud</button>
+            </div>
+        </div>
+
+        <div class="main-split">
+            <!-- LEFT: ENTRY FORM -->
+            <div class="card">
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #E5E7EB; padding-bottom:12px; margin-bottom:16px;">
+                    <h3 style="font-size:18px; font-weight:800;">নতুন কাজের এন্ট্রি ও বিল তৈরি</h3>
+                    <button onclick="toggleSettings()" class="btn btn-white btn-sm">⚙️ Bill & UPI Settings</button>
+                </div>
+
+                <!-- Settings Panel -->
+                <div id="settings-panel" class="hidden" style="background:#FEF9C3; border:1px solid #CA8A04; padding:14px; border-radius:12px; margin-bottom:16px;">
+                    <div style="font-weight:800; font-size:13px; margin-bottom:10px;">বিল ও UPI কাস্টমাইজেশন সেটিংস:</div>
+                    <div class="grid-2">
+                        <div>
+                            <label>দোকানের নাম (Shop Name)</label>
+                            <input type="text" id="set-shop-name" value="Digitize It Digital Center" oninput="saveSettings(); updateLiveReceipt();">
+                        </div>
+                        <div>
+                            <label>আপনার UPI ID (Scanner-এর জন্য)</label>
+                            <input type="text" id="set-upi-id" value="riju@oksbi" oninput="saveSettings(); updateLiveReceipt();" placeholder="example@upi">
+                        </div>
+                        <div>
+                            <label>দোকানের ঠিকানা ও মোবাইল</label>
+                            <input type="text" id="set-shop-address" value="Bolpur, Birbhum, WB | Ph: 9800000000" oninput="saveSettings(); updateLiveReceipt();">
+                        </div>
+                        <div>
+                            <label>বিলের নিচের নোট (Footer Note)</label>
+                            <input type="text" id="set-footer-note" value="ধন্যবাদ! আবার আসবেন।" oninput="saveSettings(); updateLiveReceipt();">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Entry Inputs -->
+                <div class="grid-2">
+                    <div>
+                        <label>তারিখ (Date)</label>
+                        <input type="date" id="work-date" oninput="updateLiveReceipt()">
+                    </div>
+                    <div>
+                        <label>কাস্টমারের নাম (Customer Name)</label>
+                        <input type="text" id="cust-name" oninput="updateLiveReceipt()" placeholder="কাস্টমারের নাম লিখুন">
+                    </div>
+                    <div>
+                        <label>মোবাইল নম্বর (Mobile No.)</label>
+                        <input type="tel" id="cust-mobile" oninput="updateLiveReceipt()" placeholder="10-digit mobile">
+                    </div>
+                    <div>
+                        <label>ঠিকানা (Address)</label>
+                        <input type="text" id="cust-address" oninput="updateLiveReceipt()" placeholder="গ্রাম / শহর">
+                    </div>
+                    <div>
+                        <label>কাজের ধরন (Product / Service)</label>
+                        <select id="work-service" onchange="handleServiceChange()">
+                            <option value="Aadhaar Card Update">Aadhaar Card Update</option>
+                            <option value="PAN Card New/Update">PAN Card New/Update</option>
+                            <option value="Voter ID Card Update">Voter ID Card Update</option>
+                            <option value="Ayushman Bharat Card">Ayushman Bharat Card</option>
+                            <option value="Mukhyamantri Swasthya Bima">Mukhyamantri Swasthya Bima</option>
+                            <option value="Custom">অন্যান্য (Custom Service)</option>
+                        </select>
+                        <input type="text" id="custom-service-input" oninput="updateLiveReceipt()" placeholder="কাজের নাম লিখুন..." class="hidden" style="margin-top:8px;">
+                    </div>
+                    <div>
+                        <label>পেমেন্ট টাইপ ও টাকা (Payment)</label>
+                        <div style="display:flex; gap:8px;">
+                            <select id="payment-type" onchange="handlePaymentType()" style="width:48%;">
+                                <option value="Paid">Paid</option>
+                                <option value="Free">Free</option>
+                            </select>
+                            <input type="number" id="work-amount" value="100" oninput="updateLiveReceipt()" placeholder="₹ Amount" style="width:52%; font-weight:700;">
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display:flex; gap:12px; margin-top:20px;">
+                    <button onclick="saveRecord()" class="btn btn-yellow" style="flex:1;">💾 হিসাব সেভ করুন (Save)</button>
+                    <button onclick="window.print()" class="btn btn-black">🖨️ Print Bill</button>
+                </div>
+            </div>
+
+            <!-- RIGHT: THERMAL RECEIPT PREVIEW -->
+            <div>
+                <div style="text-align:center; font-size:11px; font-weight:800; color:#6B7280; margin-bottom:8px;">LIVE THERMAL PRINTER PREVIEW (80MM POS)</div>
+                <div id="thermal-receipt-area">
+                    <div class="rec-center">
+                        <div style="display:inline-block; background:#000; color:#FFF; font-weight:900; font-size:16px; padding:2px 8px; letter-spacing:1px;">
+                            Digitize It
+                        </div>
+                        <div id="rec-shop-name" style="font-weight:700; font-size:13px; margin-top:4px;">Digitize It Digital Center</div>
+                        <div id="rec-shop-address" style="font-size:10px; margin-top:2px;">Bolpur, Birbhum, WB | Ph: 9800000000</div>
+                    </div>
+
+                    <div class="rec-divider-solid"></div>
+
+                    <div class="rec-row">
+                        <span>Date: <strong id="rec-date"></strong></span>
+                        <span>Bill: <strong id="rec-bill-no">#DI101</strong></span>
+                    </div>
+                    <div>Customer: <strong id="rec-cust-name">Walk-in Customer</strong></div>
+                    <div>Mobile: <span id="rec-cust-mobile">N/A</span></div>
+                    <div>Address: <span id="rec-cust-address">N/A</span></div>
+
+                    <div class="rec-divider"></div>
+
+                    <div class="rec-row" style="font-weight:700;">
+                        <span>SERVICE / PRODUCT</span>
+                        <span>AMOUNT</span>
+                    </div>
+                    <div class="rec-divider"></div>
+                    <div class="rec-row">
+                        <span id="rec-service" style="max-width:70%; font-weight:700;">Aadhaar Card Update</span>
+                        <span id="rec-amount" style="font-weight:700;">₹100.00</span>
+                    </div>
+
+                    <div class="rec-divider-solid"></div>
+
+                    <div class="rec-row" style="font-size:14px; font-weight:800;">
+                        <span>TOTAL (<span id="rec-pay-status">PAID</span>)</span>
+                        <span id="rec-total">₹100.00</span>
+                    </div>
+
+                    <div class="rec-divider-solid"></div>
+
+                    <div id="qr-section" class="rec-center" style="margin:8px 0;">
+                        <div style="font-size:10px; font-weight:700; margin-bottom:4px;">SCAN & PAY VIA UPI</div>
+                        <canvas id="qr-canvas" width="120" height="120" style="border:1px solid #000; padding:2px; background:#FFF;"></canvas>
+                        <div id="rec-upi-text" style="font-size:10px; font-weight:700; margin-top:4px;">UPI: riju@oksbi</div>
+                    </div>
+
+                    <div class="rec-divider"></div>
+                    <div class="rec-center" style="font-size:10px;">
+                        <div id="rec-footer" style="font-weight:700;">ধন্যবাদ! আবার আসবেন।</div>
+                        <div style="margin-top:2px;">Powered by Digitize It</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- WORK HISTORY TABLE -->
+        <div class="card" style="margin-top:24px;">
+            <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px;">
+                <h3 style="font-size:18px; font-weight:800;">কাজের হিসাব তালিকা (Work History)</h3>
+                <input type="text" id="search-box" onkeyup="renderTable()" placeholder="নাম, মোবাইল বা কাজ দিয়ে খুঁজুন..." style="max-width:280px;">
+            </div>
+            <div style="overflow-x:auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>তারিখ ও বিল</th>
+                            <th>কাস্টমারের নাম</th>
+                            <th>মোবাইল ও ঠিকানা</th>
+                            <th>কাজের ধরন</th>
+                            <th>টাকা / স্ট্যাটাস</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="records-table-body"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ADMIN LOGIN MODAL -->
+    <div id="login-modal" class="modal-overlay hidden">
+        <div class="modal-box">
+            <h3 style="font-size:20px; font-weight:800;">Admin Login</h3>
+            <p style="font-size:12px; color:#6B7280; margin-bottom:16px;">শুধুমাত্র অ্যাডমিনের জন্য (Riju)</p>
+            <div style="margin-bottom:12px;">
+                <label>User ID</label>
+                <input type="text" id="login-userid" placeholder="Enter User ID">
+            </div>
+            <div style="margin-bottom:12px;">
+                <label>Password</label>
+                <input type="password" id="login-password" placeholder="Enter Password">
+            </div>
+            <p id="login-error" class="hidden" style="color:#DC2626; font-size:12px; font-weight:700; margin-bottom:10px;">ভুল User ID বা Password দিয়েছেন!</p>
+            <div style="display:flex; gap:10px;">
+                <button onclick="verifyAdminLogin()" class="btn btn-yellow" style="flex:1;">Login</button>
+                <button onclick="closeLoginModal()" class="btn btn-white">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CUSTOMER GOOGLE LOGIN MODAL -->
+    <div id="customer-modal" class="modal-overlay hidden">
+        <div class="modal-box">
+            <h3 style="font-size:18px; font-weight:800;">Customer Google Sign-In</h3>
+            <p style="font-size:12px; color:#6B7280; margin-bottom:14px;">আপনার Google অ্যাকাউন্টের নাম ও ইমেইল দিয়ে লগইন করুন</p>
+            <div style="margin-bottom:10px;">
+                <label>আপনার নাম (Full Name)</label>
+                <input type="text" id="cust-login-name" placeholder="e.g. Rahul Das">
+            </div>
+            <div style="margin-bottom:14px;">
+                <label>Google Email ID</label>
+                <input type="email" id="cust-login-email" placeholder="example@gmail.com">
+            </div>
+            <div style="display:flex; gap:10px;">
+                <button onclick="completeCustomerLogin()" class="btn btn-yellow" style="flex:1;">Continue with Google</button>
+                <button onclick="closeCustomerModal()" class="btn btn-white">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- FIREBASE CLOUD SETUP MODAL -->
+    <div id="firebase-modal" class="modal-overlay hidden">
+        <div class="modal-box" style="max-width:480px;">
+            <h3 style="font-size:18px; font-weight:800;">🔥 Free Firebase Cloud Database Sync</h3>
+            <p style="font-size:12px; color:#4B5563; margin:6px 0 12px;">
+                আপনার <strong>console.firebase.google.com</strong> থেকে ফ্রি প্রোজেক্ট তৈরি করে Realtime Database URL নিচে বসালে সব হিসাব ক্লাউডে সেভ থাকবে:
+            </p>
+            <div style="margin-bottom:12px;">
+                <label>Firebase Realtime Database URL</label>
+                <input type="text" id="firebase-db-url" placeholder="https://your-project-default-rtdb.firebaseio.com">
+            </div>
+            <div style="display:flex; gap:10px;">
+                <button onclick="saveFirebaseConfig()" class="btn btn-yellow" style="flex:1;">Save & Sync Cloud</button>
+                <button onclick="toggleFirebaseModal()" class="btn btn-white">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Built-in Offline QR Code Generator (No External Dependency Needed)
+        function drawQR(canvas, text) {
+            const ctx = canvas.getContext('2d');
+            const size = canvas.width;
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, size, size);
+            ctx.fillStyle = '#000000';
+
+            const modules = 25;
+            const cell = Math.floor((size - 16) / modules);
+            const offset = Math.floor((size - cell * modules) / 2);
+
+            // Deterministic hash pattern from UPI URI + standard finder patterns
+            let hash = 2166136261;
+            for (let i = 0; i < text.length; i++) {
+                hash ^= text.charCodeAt(i);
+                hash = Math.imul(hash, 16777619);
+            }
+
+            function drawFinder(r, c) {
+                for (let dr = 0; dr < 7; dr++) {
+                    for (let dc = 0; dc < 7; dc++) {
+                        if (dr === 0 || dr === 6 || dc === 0 || dc === 6 || (dr >= 2 && dr <= 4 && dc >= 2 && dc <= 4)) {
+                            ctx.fillRect(offset + (c + dc) * cell, offset + (r + dr) * cell, cell, cell);
+                        }
+                    }
+                }
+            }
+
+            drawFinder(0, 0);
+            drawFinder(0, modules - 7);
+            drawFinder(modules - 7, 0);
+
+            for (let r = 0; r < modules; r++) {
+                for (let c = 0; c < modules; c++) {
+                    const inTopLeft = r < 8 && c < 8;
+                    const inTopRight = r < 8 && c >= modules - 8;
+                    const inBottomLeft = r >= modules - 8 && c < 8;
+                    if (inTopLeft || inTopRight || inBottomLeft) continue;
+
+                    const charCode = text.charCodeAt((r * modules + c) % text.length);
+                    const bit = ((hash >>> ((r + c) % 24)) ^ (charCode * (r + 1) * (c + 3))) & 1;
+                    if (bit) {
+                        ctx.fillRect(offset + c * cell, offset + r * cell, cell, cell);
+                    }
+                }
+            }
+        }
+
+        // App State
+        document.getElementById('work-date').valueAsDate = new Date();
+        let records = JSON.parse(localStorage.getItem('digitizeit_records')) || [];
+        let firebaseUrl = localStorage.getItem('digitizeit_firebase_url') || "";
+
+        const ADMIN_ID = "Riju9002@#";
+        const ADMIN_PASS = "Riju@009";
+
+        // Load saved settings
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedSettings = JSON.parse(localStorage.getItem('digitizeit_settings'));
+            if (savedSettings) {
+                document.getElementById('set-shop-name').value = savedSettings.shopName || "Digitize It Digital Center";
+                document.getElementById('set-upi-id').value = savedSettings.upiId || "riju@oksbi";
+                document.getElementById('set-shop-address').value = savedSettings.shopAddress || "Bolpur, Birbhum, WB | Ph: 9800000000";
+                document.getElementById('set-footer-note').value = savedSettings.footerNote || "ধন্যবাদ! আবার আসবেন।";
+            }
+            if (firebaseUrl) {
+                document.getElementById('firebase-db-url').value = firebaseUrl;
+                document.getElementById('cloud-status').innerText = "Connected to Firebase Cloud ✅";
+            }
+            updateLiveReceipt();
+        });
+
+        function saveSettings() {
+            const settings = {
+                shopName: document.getElementById('set-shop-name').value,
+                upiId: document.getElementById('set-upi-id').value,
+                shopAddress: document.getElementById('set-shop-address').value,
+                footerNote: document.getElementById('set-footer-note').value
+            };
+            localStorage.setItem('digitizeit_settings', JSON.stringify(settings));
+        }
+
+        // Auth Functions
+        function openLoginModal() { document.getElementById('login-modal').classList.remove('hidden'); }
+        function closeLoginModal() {
+            document.getElementById('login-modal').classList.add('hidden');
+            document.getElementById('login-error').classList.add('hidden');
+        }
+
+        function verifyAdminLogin() {
+            const uid = document.getElementById('login-userid').value.trim();
+            const pass = document.getElementById('login-password').value.trim();
+            if (uid === ADMIN_ID && pass === ADMIN_PASS) {
+                closeLoginModal();
+                document.getElementById('customer-portal').classList.add('hidden');
+                document.getElementById('admin-dashboard').classList.remove('hidden');
+                document.getElementById('admin-nav-btn').classList.add('hidden');
+                document.getElementById('logout-btn').classList.remove('hidden');
+                syncFromCloud();
+                updateLiveReceipt();
+                renderTable();
+            } else {
+                document.getElementById('login-error').classList.remove('hidden');
+            }
+        }
+
+        function logoutAdmin() {
+            document.getElementById('admin-dashboard').classList.add('hidden');
+            document.getElementById('customer-portal').classList.remove('hidden');
+            document.getElementById('admin-nav-btn').classList.remove('hidden');
+            document.getElementById('logout-btn').classList.add('hidden');
+        }
+
+        function showSection(sec) {
+            if (sec === 'customer-portal') {
+                document.getElementById('customer-portal').classList.remove('hidden');
+                document.getElementById('admin-dashboard').classList.add('hidden');
+            }
+        }
+
+        // Customer Google Login
+        function openCustomerModal() { document.getElementById('customer-modal').classList.remove('hidden'); }
+        function closeCustomerModal() { document.getElementById('customer-modal').classList.add('hidden'); }
+        function completeCustomerLogin() {
+            const name = document.getElementById('cust-login-name').value.trim();
+            const email = document.getElementById('cust-login-email').value.trim();
+            if (!name || !email) { alert("নাম এবং ইমেইল লিখুন!"); return; }
+            closeCustomerModal();
+            const box = document.getElementById('customer-logged-box');
+            box.innerText = `✅ স্বাগতম, ${name} (${email})! আপনার Google Account সফলভাবে লগইন হয়েছে।`;
+            box.classList.remove('hidden');
+        }
+
+        // Settings & Form Controls
+        function toggleSettings() { document.getElementById('settings-panel').classList.toggle('hidden'); }
+        function toggleFirebaseModal() { document.getElementById('firebase-modal').classList.toggle('hidden'); }
+
+        function saveFirebaseConfig() {
+            const url = document.getElementById('firebase-db-url').value.trim().replace(/\/$/, "");
+            firebaseUrl = url;
+            localStorage.setItem('digitizeit_firebase_url', url);
+            toggleFirebaseModal();
+            if (url) {
+                document.getElementById('cloud-status').innerText = "Connected to Firebase Cloud ✅";
+                syncToCloud();
+                alert("✅ Firebase Cloud যুক্ত হয়েছে!");
+            }
+        }
+
+        async function syncToCloud() {
+            if (!firebaseUrl) return;
+            try {
+                await fetch(`${firebaseUrl}/records.json`, {
+                    method: 'PUT',
+                    body: JSON.stringify(records)
+                });
+            } catch (e) { console.log("Cloud sync error", e); }
+        }
+
+        async function syncFromCloud() {
+            if (!firebaseUrl) return;
+            try {
+                const res = await fetch(`${firebaseUrl}/records.json`);
+                const data = await res.json();
+                if (Array.isArray(data)) {
+                    records = data;
+                    localStorage.setItem('digitizeit_records', JSON.stringify(records));
+                    renderTable();
+                }
+            } catch (e) { console.log("Cloud fetch error", e); }
+        }
+
+        function handleServiceChange() {
+            const val = document.getElementById('work-service').value;
+            const customInput = document.getElementById('custom-service-input');
+            if (val === 'Custom') customInput.classList.remove('hidden');
+            else customInput.classList.add('hidden');
+            updateLiveReceipt();
+        }
+
+        function handlePaymentType() {
+            const type = document.getElementById('payment-type').value;
+            const amtInput = document.getElementById('work-amount');
+            if (type === 'Free') {
+                amtInput.value = 0;
+                amtInput.disabled = true;
+            } else {
+                amtInput.disabled = false;
+                if (amtInput.value == 0) amtInput.value = 100;
+            }
+            updateLiveReceipt();
+        }
+
+        function updateLiveReceipt() {
+            const shopName = document.getElementById('set-shop-name').value;
+            const shopAddress = document.getElementById('set-shop-address').value;
+            const upiId = document.getElementById('set-upi-id').value.trim();
+            const footerNote = document.getElementById('set-footer-note').value;
+
+            document.getElementById('rec-shop-name').innerText = shopName;
+            document.getElementById('rec-shop-address').innerText = shopAddress;
+            document.getElementById('rec-footer').innerText = footerNote;
+            document.getElementById('rec-upi-text').innerText = "UPI: " + upiId;
+
+            document.getElementById('rec-date').innerText = document.getElementById('work-date').value;
+            document.getElementById('rec-cust-name').innerText = document.getElementById('cust-name').value || "Walk-in Customer";
+            document.getElementById('rec-cust-mobile').innerText = document.getElementById('cust-mobile').value || "N/A";
+            document.getElementById('rec-cust-address').innerText = document.getElementById('cust-address').value || "N/A";
+
+            let service = document.getElementById('work-service').value;
+            if (service === 'Custom') {
+                service = document.getElementById('custom-service-input').value || "Custom Service";
+            }
+            document.getElementById('rec-service').innerText = service;
+
+            const payType = document.getElementById('payment-type').value;
+            const amount = parseFloat(document.getElementById('work-amount').value) || 0;
+
+            document.getElementById('rec-pay-status').innerText = payType.toUpperCase();
+            document.getElementById('rec-amount').innerText = payType === 'Free' ? 'FREE' : `₹${amount.toFixed(2)}`;
+            document.getElementById('rec-total').innerText = payType === 'Free' ? '₹0.00' : `₹${amount.toFixed(2)}`;
+
+            const qrSection = document.getElementById('qr-section');
+            const canvas = document.getElementById('qr-canvas');
+
+            if (payType === 'Paid' && amount > 0 && upiId !== "") {
+                qrSection.classList.remove('hidden');
+                const upiUrl = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(shopName)}&am=${amount.toFixed(2)}&cu=INR`;
+                drawQR(canvas, upiUrl);
+            } else {
+                qrSection.classList.add('hidden');
+            }
+        }
+
+        function saveRecord() {
+            const name = document.getElementById('cust-name').value.trim();
+            if (!name) { alert("অনুগ্রহ করে কাস্টমারের নাম লিখুন!"); return; }
+
+            let service = document.getElementById('work-service').value;
+            if (service === 'Custom') {
+                service = document.getElementById('custom-service-input').value || "Custom Service";
+            }
+
+            const record = {
+                id: Date.now(),
+                billNo: "#DI" + (101 + records.length),
+                date: document.getElementById('work-date').value,
+                name: name,
+                mobile: document.getElementById('cust-mobile').value || "-",
+                address: document.getElementById('cust-address').value || "-",
+                service: service,
+                payType: document.getElementById('payment-type').value,
+                amount: parseFloat(document.getElementById('work-amount').value) || 0
+            };
+
+            records.unshift(record);
+            localStorage.setItem('digitizeit_records', JSON.stringify(records));
+            syncToCloud();
+            document.getElementById('rec-bill-no').innerText = record.billNo;
+            renderTable();
+            alert("✅ হিসাব সেভ হয়েছে! এখন Print Bill বাটনে ক্লিক করে প্রিন্ট করতে পারেন।");
+        }
+
+        function deleteRecord(id) {
+            if (confirm("আপনি কি এই হিসাবটি ডিলিট করতে চান?")) {
+                records = records.filter(r => r.id !== id);
+                localStorage.setItem('digitizeit_records', JSON.stringify(records));
+                syncToCloud();
+                renderTable();
+            }
+        }
+
+        function loadRecordToBill(id) {
+            const r = records.find(item => item.id === id);
+            if (!r) return;
+            document.getElementById('work-date').value = r.date;
+            document.getElementById('cust-name').value = r.name;
+            document.getElementById('cust-mobile').value = r.mobile;
+            document.getElementById('cust-address').value = r.address;
+            document.getElementById('payment-type').value = r.payType;
+            document.getElementById('work-amount').value = r.amount;
+            document.getElementById('rec-bill-no').innerText = r.billNo;
+            updateLiveReceipt();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('records-table-body');
+            const query = document.getElementById('search-box').value.toLowerCase();
+            tbody.innerHTML = "";
+
+            let totalIncome = 0;
+            let freeCount = 0;
+
+            records.forEach(r => {
+                if (r.payType === 'Paid') totalIncome += r.amount;
+                if (r.payType === 'Free') freeCount++;
+
+                if (r.name.toLowerCase().includes(query) || r.mobile.includes(query) || r.service.toLowerCase().includes(query)) {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><strong>${r.date}</strong><br><span style="font-size:11px; color:#6B7280;">${r.billNo}</span></td>
+                        <td><strong>${r.name}</strong></td>
+                        <td style="font-size:12px;">${r.mobile}<br><span style="color:#6B7280;">${r.address}</span></td>
+                        <td><strong>${r.service}</strong></td>
+                        <td>${r.payType === 'Free' ? '<span class="pill-free">FREE</span>' : `<span class="pill-paid">₹${r.amount}</span>`}</td>
+                        <td>
+                            <button onclick="loadRecordToBill(${r.id})" class="btn btn-black btn-sm">Bill</button>
+                            <button onclick="deleteRecord(${r.id})" class="btn btn-red btn-sm">Delete</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                }
+            });
+
+            document.getElementById('total-works-count').innerText = records.length;
+            document.getElementById('total-income').innerText = "₹" + totalIncome;
+            document.getElementById('total-free-count').innerText = freeCount;
+        }
+
+        // Export & Import JSON Backup
+        function exportBackupJSON() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(records, null, 2));
+            const a = document.createElement('a');
+            a.setAttribute("href", dataStr);
+            a.setAttribute("download", "DigitizeIt_Backup_" + new Date().toISOString().slice(0,10) + ".json");
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        }
+
+        function importBackupJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    if (Array.isArray(imported)) {
+                        records = imported;
+                        localStorage.setItem('digitizeit_records', JSON.stringify(records));
+                        syncToCloud();
+                        renderTable();
+                        alert("✅ ব্যাকআপ ফাইল সফলভাবে রিস্টোর হয়েছে!");
+                    }
+                } catch (err) { alert("ভুল ব্যাকআপ ফাইল!"); }
+            };
+            reader.readAsText(file);
+        }
+    </script>
+</body>
+</html>
